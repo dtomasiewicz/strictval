@@ -19,6 +19,7 @@ module StrictVal
     def initialize(opts = {})
       opts = opts.dup
       @null = !!opts.delete(:null)
+      # immutable should only be true if values are deeply-immutable (e.g. Integer, Structure)
       @immutable = !!opts.delete(:immutable)
       @validators = []
       supported_validators.each do |id, validator|
@@ -40,6 +41,7 @@ module StrictVal
       @immutable
     end
 
+    # return value is not meaningful
     def validate(name, value)
       if value.nil?
         raise ValidationError, "#{name} cannot be nil" unless @null
@@ -52,21 +54,22 @@ module StrictVal
       end
     end
 
+    # for mutable objects, must return a deep copy
     def deserialize(value)
+      raise NotImplementedError unless @immutable
       value
     end
 
+    # for mutable objects, must return a deep copy
     def serialize(value)
+      raise NotImplementedError unless @immutable
       value
     end
 
+    # returns same value after freezing
     def deep_freeze(value)
-      return if value.nil?
-      if @immutable
-        value
-      else
-        raise NotImplementedError
-      end
+      raise NotImplementedError unless @immutable
+      value.freeze
     end
 
   end
@@ -271,6 +274,12 @@ module StrictVal
   class StringType < DescendantType
     def initialize(opts)
       super(String, opts)
+    end
+    def serialize(value)
+      value.dup
+    end
+    def deserialize(value)
+      value.dup
     end
     def deep_freeze(value)
       value.freeze
