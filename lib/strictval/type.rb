@@ -131,7 +131,7 @@ module StrictVal
       end
     end
     def deep_freeze(value)
-      return if value.nil?
+      return value if value.nil?
       @types.each_with_index do |t, i|
         t.deep_freeze value[i]
       end
@@ -178,7 +178,7 @@ module StrictVal
       value.map{|v| @type.serialize v}
     end
     def deep_freeze(value)
-      return if value.nil?
+      return value if value.nil?
       value.each{|v| @type.deep_freeze v}
       value.freeze
     end
@@ -217,7 +217,7 @@ module StrictVal
       end]
     end
     def deep_freeze(value)
-      return if value.nil?
+      return value if value.nil?
       value.each do |k, v|
         @key_type.deep_freeze k
         @value_type.deep_freeze v
