@@ -336,7 +336,7 @@ module StrictVal
 
   def self.coerce_type(type, opts = {})
     return type if type.kind_of? Type
-    return StructureType[type, opts] if type < Structure
+    return StructureType.new(type, opts) if type < Structure
     if type.kind_of?(Class)
       CLASS_COERCE_TYPES.each do |klass, coerce_type|
         return coerce_type if klass >= type
