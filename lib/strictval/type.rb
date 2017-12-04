@@ -18,27 +18,31 @@ module StrictVal
 
     def initialize(opts = {})
       opts = opts.dup
+
+      # non-null by default
       @null = !!opts.delete(:null)
+
       # immutable should only be true if values are deeply-immutable (e.g. Integer, Structure)
       @immutable = !!opts.delete(:immutable)
+
       @validators = []
-      supported_validators.each do |id, validator|
-        if apply = opts.delete(id)
-          @validators << validator
+      if validators = opts.delete(:validate)
+        Array(validators).map do |validator|
+          if validator.kind_of? Proc
+            @validators << ->(name, value){validator.call value}
+          elsif standard_validator = supported_validators[validator]
+            @validators << standard_validator
+          else
+            raise "Unrecognized validator: #{validator}"
+          end
         end
       end
-      if custom_validator = opts.delete(:validate)
-        @validators << ->(n, v){custom_validator.call v}
-      end
+
       raise "Unrecognized options: #{opts.keys}" unless opts.empty?
     end
 
     def supported_validators
       STANDARD_VALIDATORS
-    end
-
-    def immutable?
-      @immutable
     end
 
     # return value is not meaningful

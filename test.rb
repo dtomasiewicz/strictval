@@ -7,12 +7,12 @@ require 'json'
 
 Hobby = StrictVal.define do
   string :desc
-  integer :difficulty, positive: true
+  integer :difficulty, validate: :positive
 end
 
 Person = StrictVal.define do
   string :name
-  array :hobbies, StrictVal.structure(Hobby), null: true, nonempty: true
+  array :hobbies, StrictVal.structure(Hobby), null: true, validate: :nonempty
   validate{ raise "Name must begin with a J!" unless name[0] == 'J' }
 end
 
