@@ -22,9 +22,6 @@ module StrictVal
       # non-null by default
       @null = !!opts.delete(:null)
 
-      # immutable should only be true if values are deeply-immutable (e.g. Integer, Structure)
-      @immutable = !!opts.delete(:immutable)
-
       @validators = []
       if validators = opts.delete(:validate)
         Array(validators).map do |validator|
@@ -60,20 +57,17 @@ module StrictVal
 
     # for mutable objects, must return a deep copy
     def deserialize(value)
-      raise NotImplementedError unless @immutable
-      value
+      raise NotImplementedError
     end
 
     # for mutable objects, must return a deep copy
     def serialize(value)
-      raise NotImplementedError unless @immutable
-      value
+      raise NotImplementedError
     end
 
     # returns same value after freezing
     def deep_freeze(value)
-      raise NotImplementedError unless @immutable
-      value.freeze
+      raise NotImplementedError
     end
 
   end
@@ -86,16 +80,33 @@ module StrictVal
     def validate(name, value)
       super
       return if value.nil?
-      raise ValidationError, "#{name} must be of type #{@parent_type}, found #{value}" unless value.kind_of?(@parent_type)
+      unless value.kind_of?(@parent_type)
+        raise ValidationError, "#{name} must be of type #{@parent_type}, found #{value}"
+      end
     end
     def to_s
       @parent_type.name
     end
   end
 
-  class StructureType < DescendantType
+  class ImmutableType < DescendantType
+    def initialize(parent_type, opts = {})
+      super(parent_type, opts)
+    end
+    def deserialize(value)
+      value
+    end
+    def serialize(value)
+      value
+    end
+    def deep_freeze(value)
+      value.freeze
+    end
+  end
+
+  class StructureType < ImmutableType
     def initialize(structure, opts = {})
-      super(structure, opts.merge(immutable: true))
+      super(structure, opts)
       @structure = structure
     end
     def deserialize(value)
@@ -230,10 +241,11 @@ module StrictVal
     end
   end
 
+  # TODO would it be worthwhile to embed StructureTypes in here and delegate?
   class PolyStructureType < Type
     # types is id => Class
     def initialize(id_to_structure, opts = {})
-      super(opts.merge(immutable: true))
+      super(opts)
       @id_to_structure = Hash[id_to_structure.map{|i,s| [i.to_s, s]}]
     end
     def validate(name, value)
@@ -251,7 +263,7 @@ module StrictVal
       return nil if value.nil?
       @id_to_structure.each do |id, structure|
         if value.kind_of? structure
-          return value.serialize type_id: id
+          return value.serialize TYPE_ID_FIELD => id
         end
       end
       raise "#{value.class} matches none of #{@id_to_structure.keys}"
@@ -259,11 +271,14 @@ module StrictVal
     def deserialize(value)
       @id_to_structure[value[TYPE_ID_FIELD.to_s]].deserialize value
     end
+    def deep_freeze(value)
+      value.freeze
+    end
   end
 
-  class BigDecimalType < DescendantType
+  class BigDecimalType < ImmutableType
     def initialize(opts)
-      super(BigDecimal, opts.merge(immutable: true))
+      super(BigDecimal, opts)
     end
     def deserialize(value)
       return nil if value.nil?
@@ -315,11 +330,11 @@ module StrictVal
   end
 
   def self.integer(opts = {})
-    DescendantType.new Integer, opts.merge(immutable: true)
+    ImmutableType.new Integer, opts
   end
 
   def self.float(opts = {})
-    DescendantType.new Float, opts.merge(immutable: true)
+    ImmutableType.new Float, opts
   end
 
   def self.big_decimal(opts = {})
@@ -327,7 +342,7 @@ module StrictVal
   end
 
   def self.boolean(opts = {})
-    enum DescendantType.new(Object, immutable: true), [true, false], opts
+    enum ImmutableType.new(Object), [true, false], opts
   end
 
   def self.structure(structure, opts = {})
